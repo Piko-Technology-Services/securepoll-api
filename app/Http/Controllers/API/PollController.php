@@ -83,4 +83,32 @@ class PollController extends Controller
 
         return response()->json(['message' => 'Poll deleted']);
     }
+
+    /**
+     * Publish a poll (set status to 'active')
+     */
+    public function publish(Poll $poll)
+    {
+        // Ensure only the creator can publish
+        if ($poll->user_id !== auth()->id()) {
+            return response()->json([
+                'message' => 'You are not authorized to publish this poll'
+            ], 403);
+        }
+
+        // Only draft polls can be published
+        if ($poll->status !== 'draft') {
+            return response()->json([
+                'message' => 'Poll cannot be published. It is already ' . $poll->status
+            ], 400);
+        }
+
+        $poll->status = 'active';
+        $poll->save();
+
+        return response()->json([
+            'message' => 'Poll published successfully',
+            'poll' => $poll
+        ]);
+    }
 }

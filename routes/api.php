@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/polls', [PollController::class, 'index']);
     Route::get('/polls/{id}', [PollController::class, 'show']);
+    Route::post('/publish-poll/{id}/', [PollController::class, 'publish']);
 
 });
 
