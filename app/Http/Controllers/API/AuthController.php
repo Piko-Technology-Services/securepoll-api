@@ -4,15 +4,6 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-
-class AuthController extends Controller
-{
-    //
-}
-namespace App\Http\Controllers\API;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -29,10 +20,12 @@ class AuthController extends Controller
             'password' => 'required|min:6|confirmed',
         ]);
 
+        
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => $request->password,
+            'password' => Hash::make($request->password),
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -108,4 +101,5 @@ class AuthController extends Controller
             'message' => __($status)
         ]);
     }
+
 }
