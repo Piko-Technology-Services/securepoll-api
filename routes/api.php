@@ -26,6 +26,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/polls/{id}', [PollController::class, 'show']);
     Route::post('/publish-poll/{id}/', [PollController::class, 'publish']);
 
+    Route::post('/polls/send-otp', [PollController::class, 'sendOtp']);
+    Route::post('/polls/verify-otp', [PollController::class, 'verifyOtp']);
+    Route::post('/polls/verify-password', [PollController::class, 'verifyPassword']);
+
 });
 
 Route::get('/', function () {

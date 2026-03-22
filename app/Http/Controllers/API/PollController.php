@@ -8,6 +8,10 @@ use App\Models\Category;
 use App\Models\Nominee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class PollController extends Controller
 {
@@ -111,4 +115,81 @@ class PollController extends Controller
             'poll' => $poll
         ]);
     }
+
+    public function sendOtp(Request $request)
+    {
+        $user = $request->user();
+
+        // Log OTP send info to storage/logs/laravel.log
+        \Log::info('Sending OTP to user:', [
+            'id' => $user->id,
+            'email' => $user->email,
+            'name' => $user->name,
+        ]);
+
+        $otp = rand(1000, 9999);
+
+        $user->otp = $otp;
+        $user->otp_expires_at = Carbon::now()->addMinutes(2);
+        $user->save();
+
+        // Simple mail (you can customize later)
+        Mail::raw("Your OTP is: $otp", function ($message) use ($user) {
+            $message->to($user->email)
+                    ->subject('Your Voting OTP');
+        });
+
+        return response()->json([
+            'message' => 'OTP sent successfully'
+        ]);
+    }
+
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'otp' => 'required'
+        ]);
+
+        $user = $request->user();
+
+        if (
+            $user->otp !== $request->otp ||
+            now()->gt($user->otp_expires_at)
+        ) {
+            return response()->json([
+                'message' => 'Invalid or expired OTP'
+            ], 400);
+        }
+
+        // Clear OTP after success
+        $user->otp = null;
+        $user->otp_expires_at = null;
+        $user->save();
+
+        return response()->json([
+            'message' => 'OTP verified'
+        ]);
+    }
+
+
+    public function verifyPassword(Request $request)
+{
+    $request->validate([
+        'password' => 'required|string'
+    ]);
+
+    $user = $request->user();
+
+    // 🔐 Check password
+    if (!Hash::check($request->password, $user->password)) {
+        return response()->json([
+            'message' => 'Incorrect password'
+        ], 401);
+    }
+
+    return response()->json([
+        'message' => 'Password verified successfully'
+    ]);
+}
+
 }
