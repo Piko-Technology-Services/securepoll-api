@@ -29,6 +29,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/polls/send-otp', [PollController::class, 'sendOtp']);
     Route::post('/polls/verify-otp', [PollController::class, 'verifyOtp']);
     Route::post('/polls/verify-password', [PollController::class, 'verifyPassword']);
+    
+    Route::post('/polls/{poll}/cast-vote', [PollController::class, 'castVote']);
+    Route::get('/polls/{poll}/results', [PollController::class, 'results']);
 
 });
 

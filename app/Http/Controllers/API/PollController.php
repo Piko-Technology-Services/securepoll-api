@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Poll;
+use App\Models\Vote;
 use App\Models\Category;
 use App\Models\Nominee;
 use Illuminate\Http\Request;
@@ -161,6 +162,8 @@ class PollController extends Controller
             ], 400);
         }
 
+        cache()->put('otp_verified_' . auth()->id(), true, now()->addMinutes(5));
+
         // Clear OTP after success
         $user->otp = null;
         $user->otp_expires_at = null;
@@ -187,9 +190,83 @@ class PollController extends Controller
         ], 401);
     }
 
+    cache()->put('password_verified_' . auth()->id(), true, now()->addMinutes(5));
+
     return response()->json([
         'message' => 'Password verified successfully'
     ]);
+}
+
+
+public function castVote(Request $request, Poll $poll)
+{
+    $user = $request->user();
+
+    // 🔐 CHECK ALL 3 VERIFICATIONS
+    $otp = cache()->get('otp_verified_' . $user->id);
+    $password = cache()->get('password_verified_' . $user->id);
+
+    if (!$otp || !$password) {
+        return response()->json([
+            'message' => 'Verification incomplete'
+        ], 403);
+    }
+
+    // 🧠 Validate request
+    $request->validate([
+        'selections' => 'required|array'
+    ]);
+
+    // 🚫 Prevent duplicate voting
+    $alreadyVoted = Vote::where('poll_id', $poll->id)
+        ->where('user_id', $user->id)
+        ->exists();
+
+    if ($alreadyVoted) {
+        return response()->json([
+            'message' => 'You have already voted in this poll'
+        ], 400);
+    }
+
+    // 🗳 Store votes
+    foreach ($request->selections as $categoryId => $nomineeId) {
+        Vote::create([
+            'poll_id' => $poll->id,
+            'category_id' => $categoryId,
+            'nominee_id' => $nomineeId,
+            'user_id' => $user->id,
+            'voter_identifier' => Hash::make($user->email), 
+        ]);
+    }
+
+    // 🧹 Clear verification after vote
+    cache()->forget('otp_verified_' . $user->id);
+    cache()->forget('password_verified_' . $user->id);
+
+    return response()->json([
+        'message' => 'Vote cast successfully'
+    ]);
+}
+
+
+public function results(Poll $poll)
+{
+    $poll->load([
+        'categories.nominees'
+    ]);
+
+    // Loop categories and attach vote counts
+    foreach ($poll->categories as $category) {
+        foreach ($category->nominees as $nominee) {
+            $nominee->votes_count = DB::table('votes')
+                ->where('poll_id', $poll->id)
+                ->where('category_id', $category->id)
+                ->where('nominee_id', $nominee->id)
+                ->count();
+        }
+    }
+
+    return response()->json($poll);
 }
 
 }
