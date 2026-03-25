@@ -198,55 +198,55 @@ class PollController extends Controller
 }
 
 
-public function castVote(Request $request, Poll $poll)
-{
-    $user = $request->user();
+    public function castVote(Request $request, Poll $poll)
+    {
+        $user = $request->user();
 
-    // 🔐 CHECK ALL 3 VERIFICATIONS
-    $otp = cache()->get('otp_verified_' . $user->id);
-    $password = cache()->get('password_verified_' . $user->id);
+        // 🔐 CHECK ALL 3 VERIFICATIONS
+        $otp = cache()->get('otp_verified_' . $user->id);
+        $password = cache()->get('password_verified_' . $user->id);
 
-    if (!$otp || !$password) {
+        if (!$otp || !$password) {
+            return response()->json([
+                'message' => 'Verification incomplete'
+            ], 403);
+        }
+
+        // 🧠 Validate request
+        $request->validate([
+            'selections' => 'required|array'
+        ]);
+
+        // 🚫 Prevent duplicate voting
+        $alreadyVoted = Vote::where('poll_id', $poll->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($alreadyVoted) {
+            return response()->json([
+                'message' => 'You have already voted in this poll'
+            ], 400);
+        }
+
+        // 🗳 Store votes
+        foreach ($request->selections as $categoryId => $nomineeId) {
+            Vote::create([
+                'poll_id' => $poll->id,
+                'category_id' => $categoryId,
+                'nominee_id' => $nomineeId,
+                'user_id' => $user->id,
+                'voter_identifier' => Hash::make($user->email), 
+            ]);
+        }
+
+        // 🧹 Clear verification after vote
+        cache()->forget('otp_verified_' . $user->id);
+        cache()->forget('password_verified_' . $user->id);
+
         return response()->json([
-            'message' => 'Verification incomplete'
-        ], 403);
-    }
-
-    // 🧠 Validate request
-    $request->validate([
-        'selections' => 'required|array'
-    ]);
-
-    // 🚫 Prevent duplicate voting
-    $alreadyVoted = Vote::where('poll_id', $poll->id)
-        ->where('user_id', $user->id)
-        ->exists();
-
-    if ($alreadyVoted) {
-        return response()->json([
-            'message' => 'You have already voted in this poll'
-        ], 400);
-    }
-
-    // 🗳 Store votes
-    foreach ($request->selections as $categoryId => $nomineeId) {
-        Vote::create([
-            'poll_id' => $poll->id,
-            'category_id' => $categoryId,
-            'nominee_id' => $nomineeId,
-            'user_id' => $user->id,
-            'voter_identifier' => Hash::make($user->email), 
+            'message' => 'Vote cast successfully'
         ]);
     }
-
-    // 🧹 Clear verification after vote
-    cache()->forget('otp_verified_' . $user->id);
-    cache()->forget('password_verified_' . $user->id);
-
-    return response()->json([
-        'message' => 'Vote cast successfully'
-    ]);
-}
 
 
 public function results(Poll $poll)
